@@ -1,4 +1,4 @@
 interface:
-  display_name: "Windows Proxy Route Manager"
-  short_description: "Manage Windows proxy and VPN routes."
-  default_prompt: "Diagnose Windows proxy settings or update local route bypass rules."
+  display_name: "Windows/macOS Proxy Route Manager"
+  short_description: "Manage desktop app proxies and local route bypass rules."
+  default_prompt: "Diagnose Windows or macOS proxy settings, or update local route bypass rules."

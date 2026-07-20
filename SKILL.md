@@ -1,13 +1,13 @@
 ---
 name: windows-proxy-route-manager
-description: Diagnose and fix Windows application proxy configuration and local network route bypass issues. Use when development tools or desktop apps cannot reach required services through an approved local or enterprise HTTP proxy, or when VPN/private/internal domains and IP ranges must bypass a local proxy so corporate network resources remain reachable.
+description: Diagnose and fix Windows and macOS application proxy configuration and local network route bypass issues. Use when development tools or desktop apps cannot reach required services through an approved local or enterprise HTTP proxy, or when VPN/private/internal domains and IP ranges must bypass a local proxy so corporate network resources remain reachable.
 ---
 
-# Windows Proxy Route Manager
+# Windows/macOS Proxy Route Manager
 
 ## Overview
 
-Use this skill for Windows proxy diagnostics and private-network route management in development or enterprise environments. It helps decide whether an app should use a configured local/enterprise proxy or whether a private/VPN destination should bypass that proxy.
+Use this skill for Windows/macOS proxy diagnostics and private-network route management in development or enterprise environments. It helps decide whether an app should use a configured local/enterprise proxy or whether a private/VPN destination should bypass that proxy.
 
 This skill does not provide proxy servers, credentials, traffic tunnels, remote endpoints, or access-circumvention services. Use it only on networks and systems where you have authorization.
 
@@ -17,9 +17,11 @@ This skill does not provide proxy servers, credentials, traffic tunnels, remote 
    - External development service: package registries, source repositories, API endpoints, artifact repositories.
    - Internal resource: company domains, VPN-only services, private IPs, CIDR ranges, or host mappings such as `internal.example.test=10.0.0.10`.
 2. If an external service times out while the organization-approved proxy is running:
-   - Run `scripts/diagnose-windows-app-proxy.ps1`.
+   - On Windows, run `scripts/diagnose-windows-app-proxy.ps1`.
+   - On macOS, run `scripts/diagnose-macos-app-proxy.sh`.
    - Set user proxy environment variables when needed.
-   - Set WinHTTP only when needed and preferably from Administrator PowerShell.
+   - On Windows, set WinHTTP only when needed and preferably from Administrator PowerShell.
+   - On macOS, use shell profile exports for terminals and `launchctl setenv` for newly launched GUI apps when needed.
    - Fully restart the affected app or terminal.
 3. If an internal/VPN resource fails when a local proxy or TUN mode is enabled:
    - Run `scripts/update_route_whitelist.py`.
@@ -29,7 +31,7 @@ This skill does not provide proxy servers, credentials, traffic tunnels, remote 
    - Configure applications to use the approved proxy for external services.
    - Add only internal/VPN destinations to the route bypass list.
 
-## App Proxy Diagnostics
+## Windows App Proxy Diagnostics
 
 Run a generic check:
 
@@ -60,6 +62,43 @@ Equivalent manual user environment variables:
 
 Fully quit and restart the affected app after changes. Environment variables do not update already-running processes.
 
+## macOS App Proxy Diagnostics
+
+Run a generic check:
+
+```bash
+bash ./scripts/diagnose-macos-app-proxy.sh --proxy-port 7897 --app-name git --test-url https://example.com/
+```
+
+Print suggested shell exports without writing files:
+
+```bash
+bash ./scripts/diagnose-macos-app-proxy.sh --proxy-port 7897 --print-env
+```
+
+Append proxy exports to the current user's shell profile:
+
+```bash
+bash ./scripts/diagnose-macos-app-proxy.sh --proxy-port 7897 --set-shell-env
+```
+
+Set `launchctl` user environment variables for newly launched GUI apps:
+
+```bash
+bash ./scripts/diagnose-macos-app-proxy.sh --proxy-port 7897 --set-launchctl-env
+```
+
+Equivalent manual shell exports:
+
+```bash
+export HTTP_PROXY=http://127.0.0.1:7897
+export HTTPS_PROXY=http://127.0.0.1:7897
+export ALL_PROXY=http://127.0.0.1:7897
+export NO_PROXY=localhost,127.0.0.1,::1
+```
+
+For GUI apps on macOS, environment changes normally affect only apps launched after the change. Quit and reopen the affected app.
+
 ## Private Route Bypass
 
 Use this workflow for internal domains, VPN-only services, host-to-IP mappings, private IPs, and CIDR ranges.
@@ -68,6 +107,12 @@ Examples:
 
 ```powershell
 python .\scripts\update_route_whitelist.py --entry internal.example.test=10.0.0.10 --entry 10.0.0.0/24
+```
+
+On macOS or Unix shells:
+
+```bash
+python3 ./scripts/update_route_whitelist.py --entry internal.example.test=10.0.0.10 --entry 10.0.0.0/24
 ```
 
 Use VPN-friendly route exclusions when local proxy routing conflicts with private/VPN routes:
@@ -104,7 +149,7 @@ For application proxy issues:
 
 - The affected app works after restart.
 - Proxied `curl` returns HTTP headers instead of timing out.
-- User environment variables and/or WinHTTP show the intended proxy.
+- User environment variables, WinHTTP on Windows, or `launchctl getenv` on macOS show the intended proxy.
 
 For private route bypass issues:
 
