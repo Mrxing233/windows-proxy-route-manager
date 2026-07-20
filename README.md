@@ -46,6 +46,14 @@ bash ./scripts/diagnose-macos-app-proxy.sh --proxy-port 7897 --set-launchctl-env
 
 ## 路由绕过示例
 
+预览将要修改的内容，不写入文件：
+
+```powershell
+python .\scripts\update_route_whitelist.py --entry internal.example.test=10.0.0.10 --entry 10.0.0.0/24 --dry-run
+```
+
+正式写入：
+
 ```powershell
 python .\scripts\update_route_whitelist.py --entry internal.example.test=10.0.0.10 --entry 10.0.0.0/24
 ```
@@ -53,6 +61,8 @@ python .\scripts\update_route_whitelist.py --entry internal.example.test=10.0.0.
 ```bash
 python3 ./scripts/update_route_whitelist.py --entry internal.example.test=10.0.0.10 --entry 10.0.0.0/24
 ```
+
+公网 IP/CIDR 或 `domain=公网IP` 默认不会加入 DIRECT/绕过规则。只有在明确确认公网目标也必须绕过代理时，才使用 `--allow-public-direct`。
 
 # Windows/macOS Proxy Route Manager
 
@@ -102,6 +112,14 @@ bash ./scripts/diagnose-macos-app-proxy.sh --proxy-port 7897 --set-launchctl-env
 
 ## Route Bypass Example
 
+Preview changes without writing files:
+
+```powershell
+python .\scripts\update_route_whitelist.py --entry internal.example.test=10.0.0.10 --entry 10.0.0.0/24 --dry-run
+```
+
+Apply changes:
+
 ```powershell
 python .\scripts\update_route_whitelist.py --entry internal.example.test=10.0.0.10 --entry 10.0.0.0/24
 ```
@@ -109,3 +127,5 @@ python .\scripts\update_route_whitelist.py --entry internal.example.test=10.0.0.
 ```bash
 python3 ./scripts/update_route_whitelist.py --entry internal.example.test=10.0.0.10 --entry 10.0.0.0/24
 ```
+
+Public IP/CIDR entries and `domain=public-ip` entries are rejected by default. Use `--allow-public-direct` only after confirming the public destination must bypass the proxy.

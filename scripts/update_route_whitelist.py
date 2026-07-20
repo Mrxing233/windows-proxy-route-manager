@@ -130,6 +130,33 @@ def is_private_host_ip(value):
     return any(ip in network for network in PRIVATE_HOST_NETWORKS)
 
 
+def is_private_network(value):
+    network = ipaddress.ip_network(value, strict=False)
+    if any(network.subnet_of(fake) or fake.subnet_of(network) for fake in FAKE_IP_NETWORKS):
+        return False
+    return any(
+        network.version == private.version and network.subnet_of(private)
+        for private in PRIVATE_HOST_NETWORKS
+    )
+
+
+def validate_public_direct_entries(entries, allow_public_direct):
+    if allow_public_direct:
+        return
+    public_items = []
+    for item in entries:
+        if item.get("type") == "cidr" and not is_private_network(item["value"]):
+            public_items.append(item["value"])
+        elif item.get("type") == "domain" and item.get("ip") and not is_private_host_ip(item["ip"]):
+            public_items.append(f"{item['value']}={item['ip']}")
+    if public_items:
+        joined = ", ".join(public_items)
+        raise ValueError(
+            "refuse to add public DIRECT/bypass entries without --allow-public-direct: "
+            + joined
+        )
+
+
 def resolve_private_host(domain):
     try:
         infos = socket.getaddrinfo(domain, None, proto=socket.IPPROTO_TCP)
@@ -323,6 +350,25 @@ def update_verge_system_proxy_bypass(additions, removals=None):
     return str(VERGE_CONFIG)
 
 
+def preview_verge_system_proxy_bypass(additions, removals=None):
+    if not additions:
+        return None
+    existing_text = read_text(VERGE_CONFIG)
+    if not existing_text:
+        return None
+    match = re.search(r"^system_proxy_bypass:\s*(.*)$", existing_text, re.MULTILINE)
+    if match:
+        current = match.group(1).strip()
+        existing = parse_bypass_list("" if current == "null" else current)
+        merged = merge_bypass_items(existing or DEFAULT_WINDOWS_PROXY_BYPASS, additions, removals)
+    else:
+        merged = merge_bypass_items(DEFAULT_WINDOWS_PROXY_BYPASS, additions, removals)
+    return {
+        "file": str(VERGE_CONFIG),
+        "systemProxyBypass": merged,
+    }
+
+
 def read_windows_proxy_override():
     if sys.platform != "win32":
         return None
@@ -374,6 +420,18 @@ def update_windows_proxy_override(additions, removals=None):
     if new_value == current:
         return "unchanged"
     return "updated" if write_windows_proxy_override(new_value) else None
+
+
+def preview_windows_proxy_override(additions, removals=None):
+    if sys.platform != "win32" or not additions:
+        return None
+    current = read_windows_proxy_override()
+    if current is None:
+        return None
+    return {
+        "current": parse_bypass_list(current),
+        "next": merge_bypass_items(parse_bypass_list(current), additions, removals),
+    }
 
 
 def render_script(entries, options):
@@ -556,6 +614,16 @@ def main():
         help="write only profiles/Script.js instead of also updating the current profile-bound script",
     )
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="preview files, entries, and proxy bypass changes without writing anything",
+    )
+    parser.add_argument(
+        "--allow-public-direct",
+        action="store_true",
+        help="allow public IP/CIDR or domain=public-ip DIRECT/bypass entries after explicit user approval",
+    )
+    parser.add_argument(
         "--no-windows-system-proxy-bypass",
         action="store_true",
         help="do not update Windows system proxy bypass entries for whitelisted internal domains/IPs",
@@ -621,8 +689,10 @@ def main():
     if args.internal_dns_server is not None:
         options["internalDnsServers"] = [parse_dns_server(value) for value in args.internal_dns_server]
     new_entries = [parse_entry(raw) for raw in args.entry]
+    validate_public_direct_entries(new_entries, args.allow_public_direct)
     entries = merge_entries(existing, new_entries)
     entries = apply_auto_resolved_private_hosts(entries, options)
+    validate_public_direct_entries(entries, args.allow_public_direct)
     rendered = render_script(entries, options)
     targets = [script_path]
     current_script = current_profile_script_path()
@@ -635,27 +705,43 @@ def main():
         targets.append(current_script)
     updated = []
     for target in dict.fromkeys(targets):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(rendered, encoding="utf-8")
+        if not args.dry_run:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(rendered, encoding="utf-8")
         updated.append(str(target))
     proxy_bypass = []
     verge_proxy_bypass = None
     windows_proxy_bypass = None
+    proxy_bypass_preview = None
     if not args.no_windows_system_proxy_bypass:
         proxy_bypass = windows_bypass_items_for_entries(entries)
         stale_proxy_bypass = stale_windows_bypass_items_for_entries(entries)
-        verge_proxy_bypass = update_verge_system_proxy_bypass(proxy_bypass, stale_proxy_bypass)
-        windows_proxy_bypass = update_windows_proxy_override(proxy_bypass, stale_proxy_bypass)
-    print("updated")
+        if args.dry_run:
+            proxy_bypass_preview = {
+                "vergeConfig": preview_verge_system_proxy_bypass(proxy_bypass, stale_proxy_bypass),
+                "currentSystemProxy": preview_windows_proxy_override(proxy_bypass, stale_proxy_bypass),
+            }
+        else:
+            verge_proxy_bypass = update_verge_system_proxy_bypass(proxy_bypass, stale_proxy_bypass)
+            windows_proxy_bypass = update_windows_proxy_override(proxy_bypass, stale_proxy_bypass)
+    print("dry-run" if args.dry_run else "updated")
+    print("files to update" if args.dry_run else "updated files")
     print(json.dumps(updated, ensure_ascii=False, indent=2))
+    print("managed entries")
     print(json.dumps(entries, ensure_ascii=False, indent=2))
+    print("summary")
     print(json.dumps({
         "options": options,
         "windowsSystemProxyBypass": {
             "entries": proxy_bypass,
             "vergeConfig": verge_proxy_bypass,
             "currentSystemProxy": windows_proxy_bypass,
+            "preview": proxy_bypass_preview,
         },
+        "nextSteps": [
+            "reload or reapply the local proxy profile",
+            "restart the affected app if Windows system proxy bypass or environment changed",
+        ],
     }, ensure_ascii=False, indent=2))
 
 

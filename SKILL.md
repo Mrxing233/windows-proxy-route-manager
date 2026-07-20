@@ -24,8 +24,11 @@ This skill does not provide proxy servers, credentials, traffic tunnels, remote 
    - On macOS, use shell profile exports for terminals and `launchctl setenv` for newly launched GUI apps when needed.
    - Fully restart the affected app or terminal.
 3. If an internal/VPN resource fails when a local proxy or TUN mode is enabled:
+   - If the destination type is unclear, run diagnostics first and do not modify route scripts.
    - Run `scripts/update_route_whitelist.py`.
+   - Prefer `--dry-run` first to preview the exact files, entries, and bypass changes.
    - Add only the internal domain, `domain=ip`, IP, or CIDR to the DIRECT/bypass list.
+   - Public IP/CIDR and `domain=public-ip` entries are rejected unless the user explicitly approves `--allow-public-direct`.
    - Reload the proxy profile or restart the local proxy app if system proxy bypass changed.
 4. If both external services and internal resources are needed:
    - Configure applications to use the approved proxy for external services.
@@ -105,6 +108,14 @@ Use this workflow for internal domains, VPN-only services, host-to-IP mappings, 
 
 Examples:
 
+Preview changes without writing files:
+
+```powershell
+python .\scripts\update_route_whitelist.py --entry internal.example.test=10.0.0.10 --entry 10.0.0.0/24 --dry-run
+```
+
+Apply changes:
+
 ```powershell
 python .\scripts\update_route_whitelist.py --entry internal.example.test=10.0.0.10 --entry 10.0.0.0/24
 ```
@@ -133,12 +144,16 @@ Supported entry forms:
 - Domain with host IP: `internal.example.test=10.0.0.10`
 - IP/CIDR route: `10.0.0.0/24`
 
+Public DIRECT/bypass entries are blocked by default. Use `--allow-public-direct` only after the user confirms that a public destination must bypass the proxy.
+
 After updating route scripts, reload/reapply the local proxy profile. If Windows system proxy bypass changed, toggle system proxy or restart the local proxy app.
 
 ## Guardrails
 
 - Do not delete app data, credentials, or authentication files as an early fix.
 - Do not add external public destinations to DIRECT/bypass rules unless the user explicitly requests direct access and accepts the network implications.
+- Do not use `--allow-public-direct` without explicit user approval.
+- When unsure whether a destination is internal or public, use `--dry-run` and diagnostics first.
 - Do not route internal VPN/private services through an external proxy unless explicitly required by policy.
 - Do not assume a browser working means CLI tools inherit the same proxy settings.
 - Do not run unrelated project commands for this skill.
@@ -153,5 +168,6 @@ For application proxy issues:
 
 For private route bypass issues:
 
+- Dry-run output shows the intended files, managed entries, and proxy bypass preview before any write.
 - Generated rules include the requested domain, domain suffix, IP, or CIDR DIRECT/bypass entries.
 - Internal domains/IPs open while external development services still use the configured proxy policy.
