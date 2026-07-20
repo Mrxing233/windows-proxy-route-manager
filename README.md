@@ -1,6 +1,6 @@
 # Windows 代理路由管理器
 
-一个用于诊断 Windows 应用代理设置和管理私有网络路由绕过规则的 Codex 技能。
+一个用于诊断 Windows 应用代理设置和管理私有网络路由绕过规则的技能。
 
 ## 范围
 
@@ -16,7 +16,7 @@
 
 # Windows Proxy Route Manager
 
-A Codex skill for diagnosing Windows application proxy settings and managing private-network route bypass rules.
+skill for diagnosing Windows application proxy settings and managing private-network route bypass rules.
 
 ## Scope
 
