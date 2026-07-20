@@ -1,6 +1,6 @@
 # Windows/macOS 代理路由管理器
 
-一个用于诊断 Windows/macOS 应用代理设置和管理私有网络路由绕过规则的技能。
+一个用于诊断 Windows/macOS 应用代理设置和管理私有网络路由绕过规则的 skill。
 
 ## 范围
 
