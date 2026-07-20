@@ -129,3 +129,7 @@ python3 ./scripts/update_route_whitelist.py --entry internal.example.test=10.0.0
 ```
 
 Public IP/CIDR entries and `domain=public-ip` entries are rejected by default. Use `--allow-public-direct` only after confirming the public destination must bypass the proxy.
+
+
+联系方式 ：
+mr.xing0324@outlook.com
